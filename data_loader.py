@@ -1,5 +1,7 @@
 from datasets import load_dataset
 from torch.utils.data import DataLoader
+from transformers import default_data_collator
+
 from functools import partial
 
 
@@ -21,8 +23,10 @@ class Loader:
             dataset = dataset.map(
                 self.preprocess_validation_examples,
                 batched=True,
-                remove_columns=dataset.column_names,
-                load_from_cache_file=False)
+                remove_columns=dataset.column_names)
+
+            dataset = dataset.remove_columns(["example_id", "offset_mapping"])
+
         else:
             dataset = dataset.map(
                 self.preprocess_training_examples,
@@ -30,10 +34,8 @@ class Loader:
                 remove_columns=dataset.column_names,
                 load_from_cache_file=False)
 
-        dataset.set_format(
-            type="torch", columns=["input_ids", "attention_mask", "start_positions", "end_positions"]
-        )
-        train_dataloader = DataLoader(dataset, shuffle=True, batch_size=self.batch_size)
+        dataset.set_format(type="torch")
+
         return dataset
 
     def preprocess_training_examples(self, examples):
@@ -106,7 +108,7 @@ class Loader:
 
         for i in range(len(inputs["input_ids"])):
             sample_idx = sample_map[i]
-            example_ids.append(examples["id"][sample_idx])
+            example_ids.append(examples["guid"][sample_idx])
 
             sequence_ids = inputs.sequence_ids(i)
             offset = inputs["offset_mapping"][i]
