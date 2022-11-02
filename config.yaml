@@ -1,0 +1,9 @@
+CFG:
+  PLM: klue/bert-base
+  dset_name: klue
+  task: mrc
+  batch_size: 32
+  max_length: 384
+  stride: 128
+  truncation: only_second
+  padding: max_length  
