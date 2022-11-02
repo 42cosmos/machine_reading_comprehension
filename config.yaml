@@ -2,8 +2,22 @@ CFG:
   PLM: klue/bert-base
   dset_name: klue
   task: mrc
-  batch_size: 32
+  train_batch_size: 32
+  eval_batch_size: 32
   max_length: 384
   stride: 128
   truncation: only_second
-  padding: max_length  
+  padding: max_length
+  num_train_epochs: 3.0
+  learning_rate: 5e-5
+  adam_epsilon: 1e-8
+  fp16: true
+  gradient_accumulation_steps: 1 
+  seed: 42
+  max_grad_norm: 1.0
+  warmup_steps: 20
+  max_answer_length: 30
+  logging_steps: 500
+
+  do_lower_case: true
+  
