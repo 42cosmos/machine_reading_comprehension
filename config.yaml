@@ -2,22 +2,40 @@ CFG:
   PLM: klue/bert-base
   dset_name: klue
   task: mrc
-  train_batch_size: 32
-  eval_batch_size: 32
-  max_length: 384
-  stride: 128
+  model_name_or_path: klue/bert-base
+  output_dir: null
+
+  max_seq_length: 512
+  max_query_length: 64
   truncation: only_second
   padding: max_length
-  num_train_epochs: 3.0
+  threads: 4
+
+  stride: 128
+  doc_stride: 128
+  train_batch_size: 32
+  eval_batch_size: 32
+  num_train_epochs: 5
   learning_rate: 5e-5
   adam_epsilon: 1e-8
   fp16: true
-  gradient_accumulation_steps: 1 
   seed: 42
   max_grad_norm: 1.0
   warmup_steps: 20
   max_answer_length: 30
   logging_steps: 500
+  save_steps: 500
+  evaluate_during_training: true
+  weight_decay: 0.01
 
+  max_steps: -1
+  gradient_accumulation_steps: 1
+  n_best_size: 20
+  null_score_diff_threshold: 0.0
+  version_2_with_negative: true
+  verbose_logging: true
   do_lower_case: true
-  
+
+  # wandb setting
+  entity_name: cosmos42
+  project_name: machine-reading-comprehension
