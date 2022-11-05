@@ -21,7 +21,7 @@ class KlueMRCProcessor:
         with open("config.yaml") as f:
             saved_hparams = yaml.load(f, Loader=yaml.FullLoader)
             self.hparams = EasyDict(saved_hparams)["CFG"]
-        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.model_name_or_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.PLM, use_fast=False)
 
     def get_train_dataset(self):
         return self._create_dataset("train")
@@ -59,7 +59,7 @@ class KlueMRCProcessor:
             question = q["question"]
             question_type = q["question_type"]
             id_ = q["guid"]
-            answer_text = q["answers"]["text"]
+            answer_text = q["answers"]["text"][0]
             answer_start = q["answers"]["answer_start"][0]
             answer_impossibility = q["is_impossible"]
             examples.append(
