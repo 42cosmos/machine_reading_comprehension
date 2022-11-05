@@ -3,7 +3,8 @@ CFG:
   dset_name: klue
   task: mrc
   model_name_or_path: klue/bert-base
-  output_dir: null
+  output_dir: ./output
+  data_dir: ./data
 
   max_seq_length: 512
   max_query_length: 64
