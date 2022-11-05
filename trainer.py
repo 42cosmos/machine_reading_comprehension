@@ -1,3 +1,4 @@
+import os
 import timeit
 
 import torch
@@ -6,36 +7,62 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering,
-    get_scheduler,
-    default_data_collator,
+    get_linear_schedule_with_warmup,
     set_seed)
-from tqdm.auto import tqdm
 
+from transformers.data.metrics.squad_metrics import (
+    compute_predictions_logits,
+    squad_evaluate,
+)
+
+from transformers.data.processors.squad import SquadResult
 from accelerate import Accelerator
 
 import logging
+from tqdm.auto import tqdm
+from typing import List
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 
+def to_list(tensor):
+    return tensor.detach().cpu().tolist()
+
+
+@dataclass
+class QAResults:
+    results: List[SquadResult]
+
+
 class Trainer(object):
-    def __init__(self, config, train_dataset=None, test_dataset=None):
+    def __init__(self,
+                 config,
+                 train_dataset=None,
+                 test_dataset=None):
         self.config = config
+
+        self.accelerator = Accelerator(fp16=config.fp16)
+        self.device = self.accelerator.device
+
         self.num_train_epochs = config.num_train_epochs
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = AutoModelForQuestionAnswering.from_pretrained(config.PLM)
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        self.model.to(device)
+        self.tokenizer = AutoTokenizer.from_pretrained(config.PLM)
+        self.model = AutoModelForQuestionAnswering.from_pretrained(config.PLM)
 
     def train(self):
         train_sampler = RandomSampler(self.train_dataset)
         train_dataloader = DataLoader(self.train_dataset, sampler=train_sampler,
                                       batch_size=self.config.train_batch_size)
-        t_total = len(train_dataloader) * self.num_train_epochs
+
+        if self.config.max_steps > 0:
+            t_total = self.config.max_steps
+            self.num_train_epochs = self.config.max_steps // (
+                    len(train_dataloader) // self.config.gradient_accumulation_steps) + 1
+        else:
+            t_total = len(train_dataloader) // self.config.gradient_accumulation_steps * self.num_train_epochs
 
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
@@ -48,25 +75,43 @@ class Trainer(object):
                 "weight_decay": 0.0,
             }
         ]
-        accelerator = Accelerator()
-        optimizer = AdamW(optimizer_grouped_parameters, lr=self.config.learning_rate, eps=self.config.adam_epsilon)
-        scheduler = get_scheduler(self.model.parameters(), lr=self.config.learning_rate, num_training_steps=t_total)
 
-        if self.config.fp16:
-            self.model, optimizer, train_dataloader = accelerator.prepare(self.model, optimizer, train_dataloader)
+        optimizer = AdamW(optimizer_grouped_parameters,
+                          lr=float(self.config.learning_rate),
+                          eps=float(self.config.adam_epsilon))
+        scheduler = get_linear_schedule_with_warmup(optimizer,
+                                                    num_warmup_steps=self.config.warmup_steps,
+                                                    num_training_steps=t_total)
+
+        self.model, optimizer, train_dataloader = self.accelerator.prepare(self.model, optimizer, train_dataloader)
 
         logger.info("***** Running training *****")
         logger.info("  Num examples = %d", len(self.train_dataset))
         logger.info("  Num Epochs = %d", self.num_train_epochs)
         logger.info("  Instantaneous batch size per device = %d", self.config.train_batch_size)
         logger.info("  Total train batch size (w. parallel, distributed & accumulation) = %d",
-                    self.config.train_batch_size * accelerator.num_processes * self.config.gradient_accumulation_steps)
+                    self.config.train_batch_size * self.accelerator.num_processes * self.config.gradient_accumulation_steps)
         logger.info("  Gradient Accumulation steps = %d", self.config.gradient_accumulation_steps)
         logger.info("  Total optimization steps = %d", t_total)
 
         global_step = 1
         epochs_trained = 0
         steps_trained_in_current_epoch = 0
+
+        if os.path.exists(self.config.model_name_or_path):
+            try:
+                checkpoint_suffix = self.config.model_name_or_path.split("-")[-1].split("/")[0]
+                global_step = int(checkpoint_suffix)
+                epochs_trained = global_step // (len(train_dataloader) // self.config.gradient_accumulation_steps)
+                steps_trained_in_current_epoch = global_step % (
+                        len(train_dataloader) // self.config.gradient_accumulation_steps)
+
+                logger.info("  Continuing training from checkpoint, will skip to saved global_step")
+                logger.info(f"  Continuing training from epoch {epochs_trained}")
+                logger.info(f"  Continuing training from global step {global_step}")
+                logger.info(f"  Will skip the first {steps_trained_in_current_epoch} steps in the first epoch")
+            except ValueError:
+                logger.info("  Starting fine-tuning.")
 
         tr_loss, logging_loss = 0.0, 0.0
         self.model.zero_grad()
@@ -77,45 +122,70 @@ class Trainer(object):
         for _ in train_iterator:
             epoch_iterator = tqdm(train_dataloader, desc="Iteration")
             for step, batch in enumerate(epoch_iterator):
+                batch = tuple(t.to(self.device) for t in batch)
+                inputs = {
+                    "input_ids": batch[0],
+                    "attention_mask": batch[1],
+                    "token_type_ids": batch[2],
+                    "start_positions": batch[3],
+                    "end_positions": batch[4],
+                }
+                # if self.config.version_2_with_negative:
+                #     # check is_impossible values in dataset
+                #     inputs.update({"is_impossible": batch[5]})
                 if steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     continue
 
-            self.model.train()
-            batch = {k: v.to(self.device) for k, v in batch.items()}
-            outputs = self.model(**batch)
+                self.model.train()
+                outputs = self.model(**inputs)
 
-            loss = outputs[0]
-            if self.config.gradient_accumulation_steps > 1:
-                loss = loss / self.config.gradient_accumulation_steps
+                loss = outputs[0]
+                if self.config.gradient_accumulation_steps > 1:
+                    loss = loss / self.config.gradient_accumulation_steps
 
-            if self.config.fp16:
-                accelerator.backward(loss)
+                self.accelerator.backward(loss)
 
-            tr_loss += loss.item()
-            if (step + 1) % self.config.gradient_accumulation_steps == 0:
-                if self.config.fp16:
-                    torch.nn.utils.clip_grad_norm_(accelerator.master_params(optimizer), self.config.max_grad_norm)
-                else:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.max_grad_norm)
+                tr_loss += loss.item()
 
-                optimizer.step()
-                scheduler.step()  # Update learning rate schedule
-                self.model.zero_grad()
-                global_step += 1
+                if (step + 1) % self.config.gradient_accumulation_steps == 0:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(optimizer),
+                                                   self.config.max_grad_norm)
 
-                if self.config.logging_steps > 0 and global_step % self.config.logging_steps == 0:
-                    if self.config.evaluate_during_training:
-                        results = self.evaluate()
-                        for key, value in results.items():
-                            logger.info("  %s = %s", key, value)
+                    optimizer.step()
+                    scheduler.step()  # Update learning rate schedule
+                    self.model.zero_grad()
+                    global_step += 1
+
+                    # Log Metrics
+                    if self.config.logging_steps > 0 and global_step % self.config.logging_steps == 0:
+                        if self.config.evaluate_during_training:
+                            logger.info("***** Running Evaluation *****")
+                            results = self.evaluate()
+                            for key, value in results.items():
+                                logger.info(f"  {key} = {value}")
+                                # put results in wandb
+
+                        logging_loss = tr_loss
+
+                    # if self.config.save_steps > 0 and global_step % self.config.save_steps == 0:
+                    # put save model checkpoint code
+                if 0 < self.config.max_steps < global_step:
+                    epoch_iterator.close()
+                    break
+            if 0 < self.config.max_steps < global_step:
+                train_iterator.close()
+                break
+
+        return global_step, tr_loss / global_step
 
     def evaluate(self):
-        eval_sampler = SequentialSampler(self.test_dataset)
-        eval_dataloader = DataLoader(self.test_dataset, sampler=eval_sampler, batch_size=self.config.eval_batch_size)
+        dataset, examples, features = self.test_dataset
+        eval_sampler = SequentialSampler(dataset)
+        eval_dataloader = DataLoader(dataset, sampler=eval_sampler, batch_size=self.config.eval_batch_size)
 
         logger.info("***** Running evaluation *****")
-        logger.info(f"  Num examples = {len(self.test_dataset)}")
+        logger.info(f"  Num examples = {len(dataset)}")
         logger.info(f"  Batch size = {self.config.eval_batch_size}")
 
         all_result = []
@@ -123,29 +193,53 @@ class Trainer(object):
 
         for batch in tqdm(eval_dataloader, desc="Evaluation"):
             self.model.eval()
-            batch = {k: v.to(self.device) for k, v in batch.items()}
 
             with torch.no_grad():
-                outputs = self.model(**batch)
+                batch = tuple(t.to(self.device) for t in batch)
+                inputs = {
+                    "input_ids": batch[0],
+                    "attention_mask": batch[1],
+                    "token_type_ids": batch[2],
+                }
+                outputs = self.model(**inputs)
+                start_logits = outputs.start_logits
+                end_logits = outputs.end_logits
 
-            for i in range(len(outputs.start_logits)):
-                start_logits = outputs.start_logits[i].detach().cpu().numpy()
-                end_logits = outputs.end_logits[i].detach().cpu().numpy()
-                all_result.append((start_logits, end_logits))
+            feature_indices = batch[3].tolist()
+            for i, feature_index in enumerate(feature_indices):
+                unique_id = int(features[feature_index].unique_id)
+                single_example_start_logits = to_list(start_logits[i])
+                single_example_end_logits = to_list(end_logits[i])
+                result = SquadResult(unique_id, single_example_start_logits, single_example_end_logits)
+                all_result.append(result)
 
         eval_time = timeit.default_timer() - start_time
         logger.info(
             f"  Evaluation done in total {eval_time} secs {eval_time / len(self.test_dataset)} sec per example)")
 
+        output_prediction_file = os.path.join(self.config.output_dir, "predictions.json")
+        output_nbest_file = os.path.join(self.config.output_dir, "nbest_predictions.json")
+
+        if self.config.version_2_with_negative:
+            output_null_log_odds_file = os.path.join(self.config.output_dir, "null_odds.json")
+        else:
+            output_null_log_odds_file = None
+
         predictions = compute_predictions_logits(
-            self.test_dataset,
-            all_result,
-            self.config.n_best_size,
-            self.config.max_answer_length,
-            self.config.do_lower_case,
-            tokenizer
+            all_examples=examples,
+            all_features=features,
+            all_results=all_result,
+            n_best_size=self.config.n_best_size,
+            max_answer_length=self.config.max_answer_length,
+            do_lower_case=self.config.do_lower_case,
+            tokenizer=self.tokenizer,
+            output_null_log_odds_file=output_null_log_odds_file,
+            null_score_diff_threshold=self.config.null_score_diff_threshold,
+            version_2_with_negative=self.config.version_2_with_negative,
+            verbose_logging=self.config.verbose_logging,
+            output_prediction_file=output_prediction_file,
+            output_nbest_file=output_nbest_file,
         )
 
-        result = squad_evaluate(self.test_dataset, predictions)
+        result = squad_evaluate(examples, predictions)
         return result
-
