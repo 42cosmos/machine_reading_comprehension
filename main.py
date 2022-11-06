@@ -1,9 +1,6 @@
 import os
 import yaml
 from easydict import EasyDict
-from transformers import (
-    set_seed,
-    AutoTokenizer)
 
 from klue_data_loader import KlueMRCProcessor
 from trainer import Trainer
@@ -11,7 +8,7 @@ from trainer import Trainer
 import wandb
 import logging
 from dotenv import load_dotenv
-from torch.utils.data import DataLoader, SequentialSampler
+
 
 if __name__ == "__main__":
     logger = logging.getLogger(__name__)
@@ -37,7 +34,6 @@ if __name__ == "__main__":
     global_step, tr_loss = trainer.train()
     logger.info(f" global_step = {global_step}, average loss = {tr_loss}")
 
-    # put load_model code
     trainer.evaluate()
 
     wandb.finish()
