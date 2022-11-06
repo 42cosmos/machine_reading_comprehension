@@ -170,14 +170,23 @@ class Trainer(object):
                         if self.config.evaluate_during_training:
                             logger.info("***** Running Evaluation *****")
                             results = self.evaluate()
-                            for key, value in results.items():
-                                logger.info(f"  {key} = {value}")
-                                # put results in wandb
+                            logger.info(f"evaluate/EM = {results}")
 
                         logging_loss = tr_loss
 
-                    # if self.config.save_steps > 0 and global_step % self.config.save_steps == 0:
-                    # put save model checkpoint code
+                    if self.config.save_steps > 0 and global_step % self.config.save_steps == 0:
+                        output_dir = os.path.join(self.config.output_dir, f"checkpoint-{global_step}")
+                        if not os.path.exists(output_dir):
+                            os.makedirs(output_dir)
+                        model_to_save = self.model.module if hasattr(self.model, "module") else self.model
+                        model_to_save.save_pretrained(output_dir)
+                        self.tokenizer.save_pretrained(output_dir)
+
+                        logger.info(f"Saving model checkpoint to {output_dir}")
+
+                        torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
+                        torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
+                        logger.info(f"Saving optimizer and scheduler states to {output_dir}")
 
                 if 0 < self.config.max_steps < global_step:
                     epoch_iterator.close()
@@ -256,5 +265,7 @@ class Trainer(object):
         logger.info("***** EM results *****")
         logger.info(f"  EM = {em_result}")
         wandb.log({"EM": em_result})
+
+        f1_results = squad_evaluate(preds=predictions, examples=examples)
 
         return em_result
