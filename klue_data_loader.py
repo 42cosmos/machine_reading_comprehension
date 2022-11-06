@@ -64,7 +64,6 @@ class KlueMRCProcessor:
 
     def _create_dataset(self, examples, dataset_type: str):
         is_training = dataset_type == "train"
-        # examples = self._create_examples(is_training)
         features, dataset = squad_convert_examples_to_features(
             examples=examples,
             tokenizer=self.tokenizer,
@@ -92,9 +91,20 @@ class KlueMRCProcessor:
             question = q["question"]
             question_type = q["question_type"]
             id_ = q["guid"]
-            answer_text = q["answers"]["text"][0]
-            answer_start = q["answers"]["answer_start"][0]
             answer_impossibility = q["is_impossible"]
+            if not is_training:
+                answers = q["answers"]
+                answer_text = None
+                start_position_character = None
+            elif is_training and not answer_impossibility:
+                answers = []
+                answer_text = q["answers"]["text"][0]
+                start_position_character = q["answers"]["answer_start"][0]
+            elif is_training and answer_impossibility:
+                answers = []
+                answer_text = ""
+                start_position_character = -1
+
             examples.append(
                 KlueMRCExample(
                     question_type=question_type,
@@ -102,10 +112,10 @@ class KlueMRCProcessor:
                     question_text=question,
                     context_text=context,
                     answer_text=answer_text,
-                    start_position_character=answer_start,
-                    title="",
+                    start_position_character=start_position_character,
+                    title=q["title"],
                     is_impossible=answer_impossibility,
-                    answers=[],
+                    answers=answers,
                 )
             )
 
