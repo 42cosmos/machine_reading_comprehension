@@ -2,6 +2,7 @@ import os
 import timeit
 
 import torch
+import wandb
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from transformers import (
@@ -22,6 +23,7 @@ import logging
 from tqdm.auto import tqdm
 from typing import List
 from dataclasses import dataclass
+from metrics import BaseMetric, klue_mrc_em
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,7 @@ class Trainer(object):
 
         self.accelerator = Accelerator(fp16=config.fp16)
         self.device = self.accelerator.device
+        self.metrics = BaseMetric(klue_mrc_em)
 
         self.num_train_epochs = config.num_train_epochs
         self.train_dataset = train_dataset
@@ -51,6 +54,7 @@ class Trainer(object):
 
         self.tokenizer = AutoTokenizer.from_pretrained(config.PLM)
         self.model = AutoModelForQuestionAnswering.from_pretrained(config.PLM)
+        self.model.to(self.device)
 
     def train(self):
         train_sampler = RandomSampler(self.train_dataset)
@@ -131,8 +135,9 @@ class Trainer(object):
                     "end_positions": batch[4],
                 }
                 # if self.config.version_2_with_negative:
-                #     # check is_impossible values in dataset
-                #     inputs.update({"is_impossible": batch[5]})
+                # check is_impossible values in dataset
+                # inputs.update({"is_impossible": batch[5]})
+
                 if steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     continue
@@ -155,6 +160,9 @@ class Trainer(object):
                     optimizer.step()
                     scheduler.step()  # Update learning rate schedule
                     self.model.zero_grad()
+
+                    wandb.log({"loss": loss})
+
                     global_step += 1
 
                     # Log Metrics
@@ -170,6 +178,7 @@ class Trainer(object):
 
                     # if self.config.save_steps > 0 and global_step % self.config.save_steps == 0:
                     # put save model checkpoint code
+
                 if 0 < self.config.max_steps < global_step:
                     epoch_iterator.close()
                     break
@@ -206,10 +215,12 @@ class Trainer(object):
                 end_logits = outputs.end_logits
 
             feature_indices = batch[3].tolist()
+
             for i, feature_index in enumerate(feature_indices):
                 unique_id = int(features[feature_index].unique_id)
                 single_example_start_logits = to_list(start_logits[i])
                 single_example_end_logits = to_list(end_logits[i])
+
                 result = SquadResult(unique_id, single_example_start_logits, single_example_end_logits)
                 all_result.append(result)
 
@@ -241,5 +252,9 @@ class Trainer(object):
             output_nbest_file=output_nbest_file,
         )
 
-        result = squad_evaluate(examples, predictions)
-        return result
+        em_result = self.metrics(predictions, examples)
+        logger.info("***** EM results *****")
+        logger.info(f"  EM = {em_result}")
+        wandb.log({"EM": em_result})
+
+        return em_result
