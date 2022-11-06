@@ -8,6 +8,7 @@ CFG:
 
   max_seq_length: 512
   max_query_length: 64
+  max_answer_length: 30
   truncation: only_second
   padding: max_length
   threads: 4
