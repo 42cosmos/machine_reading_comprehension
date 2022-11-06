@@ -33,7 +33,7 @@ class KlueMRCProcessor:
 
     def get_dataset(self, evaluate=False, output_examples=False):
         dataset_type = "validation" if evaluate else "train"
-        cached_file_name = f"cached_{self.hparams.task}_{self.hparams.max_seq_length}_{self.hparams.dset_name}"
+        cached_file_name = f"cached_{self.hparams.task}_{self.hparams.max_seq_length}_{self.hparams.dset_name}_{dataset_type}"
         cached_features_file = os.path.join(self.hparams.data_dir, cached_file_name)
 
         if os.path.exists(cached_features_file):
