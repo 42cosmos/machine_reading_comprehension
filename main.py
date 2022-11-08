@@ -9,8 +9,16 @@ import wandb
 import logging
 from dotenv import load_dotenv
 
+import argparse
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
+    parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
+
+    args = parser.parse_args()
+
     logger = logging.getLogger(__name__)
     load_dotenv()
     WANDB_AUTH_KEY = os.getenv("WANDB_AUTH_KEY")
@@ -31,9 +39,11 @@ if __name__ == "__main__":
                       test_dataset=(test_dataset, examples, features)
                       )
 
-    global_step, tr_loss = trainer.train()
-    logger.info(f" global_step = {global_step}, average loss = {tr_loss}")
+    if args.do_train:
+        global_step, tr_loss = trainer.train()
+        logger.info(f" global_step = {global_step}, average loss = {tr_loss}")
 
-    trainer.evaluate()
+    if args.do_eval:
+        trainer.evaluate()
 
     wandb.finish()
