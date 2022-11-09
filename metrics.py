@@ -1,12 +1,16 @@
 import re
 import string
+import logging
+import numpy as np
+
 import torch
 from difflib import SequenceMatcher
 from typing import List, Dict, Tuple, Sequence, Any, Optional, Callable
 from pytorch_lightning.metrics import Metric
-import numpy as np
+import evaluate
+from transformers import EvalPrediction
+
 from klue_data_loader import KlueMRCExample
-import logging
 
 NORMALIZE_CHAR_PATTERN = re.compile(r"[\'\"《》<>〈〉]\(\)\‘\’")
 PUNCTUATION_SET = set(string.punctuation)
@@ -116,12 +120,11 @@ def compute_em_and_rouge_w_score_for_klue_mrc(pred: str, labels: List[str]) -> T
     return max(em_scores), max(rouge_scores)
 
 
-def klue_mrc_em(preds: List[Dict[str, str]], examples: List[List[KlueMRCExample]]) -> Any:
+def klue_mrc_em(preds: List[Dict[str, str]], examples: List[List[KlueMRCExample]], mrc_num_question_type=5) -> Any:
     """KLUE-MRC Exact Match (EM)"""
-    KLUE_MRC_NUM_QUESTION_TYPE = 3
     preds, examples = preds[0], examples[0]
 
-    em_scores_per_question_type: List[List[float]] = [[], [], []]
+    em_scores_per_question_type: List[List[float]] = [[] for _ in range(mrc_num_question_type)]
     for example in examples:
         prediction = normalize_answer_for_klue_mrc(preds[example.qas_id])
         ground_truths = [normalize_answer_for_klue_mrc(answer) for answer in example.answers["text"]]
@@ -140,3 +143,17 @@ def klue_mrc_em(preds: List[Dict[str, str]], examples: List[List[KlueMRCExample]
 
     total_em_scores = [score for scores in em_scores_per_question_type for score in scores]
     return np.mean(total_em_scores) * 100.0
+
+#
+# def mrc_f1(p: EvalPrediction):
+#     """KLUE-MRC F1 score"""
+#     metric = evaluate.load("squad")
+#     return metric.compute(predictions=p.predictions, references=p.label_ids)
+
+def mrc_f1(examples, predictions):
+    metric = evaluate.load("squad")
+    formatted_preds = [
+        {"id": k, "prediction_text": v} for k, v in predictions.items()
+    ]
+    references = [{"id": ex.qas_id, "answers": ex.answers} for ex in examples]
+    return metric.compute(predictions=predictions, references=examples)
