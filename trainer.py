@@ -54,7 +54,7 @@ class Trainer(object):
         self.test_dataset = test_dataset
         self.model_type = config.model_name_or_path.split("/")[1].split("-")[0]
 
-        self.tokenizer = AutoTokenizer.from_pretrained(config.PLM)
+        self.tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path)
         self.model = AutoModelForQuestionAnswering.from_pretrained(config.model_name_or_path)
 
         self.model.to(self.device)
@@ -185,10 +185,6 @@ class Trainer(object):
                         if self.config.evaluate_during_training:
                             logger.info("***** Running Evaluation *****")
                             results = self.evaluate()
-                            # for key, value in results.items():
-                            wandb.log({f"eval_EM": results})
-                            logger.info(f"eval_EM {results}")
-                            # logger.info(f"evaluate/EM = {results}")
 
                         logging_loss = tr_loss
 
@@ -283,14 +279,11 @@ class Trainer(object):
             output_nbest_file=output_nbest_file,
         )
 
-        em_result = self.metrics(predictions, examples)
-        f1_result = mrc_f1(predictions, examples)
-
-        eval_result = {"EM": em_result, "F1": f1_result}
+        f1_result = mrc_f1(predictions=predictions, examples=examples)
 
         logger.info("***** EM / F1 results *****")
-        for key, value in eval_result.items():
+        for key, value in f1_result.items():
             logger.info(f"  {key} = {value}")
 
-        # wandb.log(eval_result)
-        return eval_result
+        wandb.log(f1_result)
+        return f1_result
