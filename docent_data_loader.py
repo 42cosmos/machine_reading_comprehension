@@ -30,7 +30,7 @@ class DocentMRCProcessor:
         with open("config.yaml") as f:
             saved_hparams = yaml.load(f, Loader=yaml.FullLoader)
             self.hparams = EasyDict(saved_hparams)["CFG"]
-        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.PLM, use_fast=False)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.model_name_or_path, use_fast=False)
 
     def get_dataset(self, evaluate=False, output_examples=False):
         dataset_type = "validation" if evaluate else "train"
@@ -88,35 +88,36 @@ class DocentMRCProcessor:
         examples = []
         mode = "train" if is_training else "validation"
         for q in tqdm(data_list):
+            context_id = q["id"]
             context = q["explain"]
             title = q["title"]
 
-            if len(q["q&a"]) > 1:
-                for qa in q["q&a"]:
-                    id_ = qa["QnAID"]
-                    question = qa["Questions"]
-                    answer_text = qa["Answer"]
-                    question_type = qa["Type"]
-                    start_position_character = qa["StartPoint"]
+            for qa in q["q&a"]:
+                id_ = f'{context_id}-{qa["QnAID"]}'
+                question = qa["Questions"]
+                answer_text = qa["Answer"]
+                question_type = qa["Type"]
+                start_position_character = qa["StartPoint"]
 
-                    answers = [{"text": [answer_text], "answer_start": [start_position_character]}]
+                answers = {"text": [answer_text], "answer_start": [start_position_character]}
 
-                    if not is_training:
-                        answer_text = None
-                        start_position_character = None
+                if not is_training:
+                    answer_text = None
+                    start_position_character = None
 
-                    example = KlueMRCExample(
-                        question_type=question_type,
-                        qas_id=id_,
-                        question_text=question,
-                        answers=answers,
-                        context_text=context,
-                        answer_text=answer_text,
-                        start_position_character=start_position_character,
-                        title=title,
-                        is_impossible=False,)
+                example = KlueMRCExample(
+                    question_type=question_type,
+                    qas_id=id_,
+                    question_text=question,
+                    answers=answers,
+                    context_text=context,
+                    answer_text=answer_text,
+                    start_position_character=start_position_character,
+                    title=title,
+                    is_impossible=False,
+                )
 
-                    examples.append(example)
+                examples.append(example)
 
         return examples
 

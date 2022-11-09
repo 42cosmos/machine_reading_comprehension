@@ -1,8 +1,7 @@
 CFG:
-  PLM: klue/bert-base
   dset_name: klue
   task: mrc
-  model_name_or_path: klue/bert-base
+  model_name_or_path: klue/roberta-large
   output_dir: ./output
   data_dir: ./data
 
@@ -15,8 +14,8 @@ CFG:
 
   stride: 128
   doc_stride: 128
-  train_batch_size: 32
-  eval_batch_size: 32
+  train_batch_size: 8
+  eval_batch_size: 8
   num_train_epochs: 5
   learning_rate: 5e-5
   adam_epsilon: 1e-8
@@ -24,7 +23,6 @@ CFG:
   seed: 42
   max_grad_norm: 1.0
   warmup_steps: 20
-  max_answer_length: 30
   logging_steps: 500
   save_steps: 500
   evaluate_during_training: true

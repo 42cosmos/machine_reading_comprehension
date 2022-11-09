@@ -29,7 +29,7 @@ class KlueMRCProcessor:
         with open("config.yaml") as f:
             saved_hparams = yaml.load(f, Loader=yaml.FullLoader)
             self.hparams = EasyDict(saved_hparams)["CFG"]
-        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.PLM, use_fast=False)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.model_name_or_path, use_fast=False)
 
     def get_dataset(self, evaluate=False, output_examples=False):
         dataset_type = "validation" if evaluate else "train"
