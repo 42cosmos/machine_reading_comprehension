@@ -136,7 +136,7 @@ def klue_mrc_em(preds: List[Dict[str, str]], examples: List[List[KlueMRCExample]
         em_scores_per_question_type[example.question_type - 1].append(em_score)
 
     logger.info("** Exact Match(EM) scores by type **")
-    for question_type in range(KLUE_MRC_NUM_QUESTION_TYPE):
+    for question_type in range(mrc_num_question_type):
         question_type_em_scores = em_scores_per_question_type[question_type]
         avg_em_score = np.mean(question_type_em_scores) * 100.0
         logger.info(f"type{question_type + 1} ({len(question_type_em_scores)}): {avg_em_score:.4f}")
@@ -156,4 +156,4 @@ def mrc_f1(examples, predictions):
         {"id": k, "prediction_text": v} for k, v in predictions.items()
     ]
     references = [{"id": ex.qas_id, "answers": ex.answers} for ex in examples]
-    return metric.compute(predictions=predictions, references=examples)
+    return metric.compute(predictions=formatted_preds, references=references)
