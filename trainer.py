@@ -9,7 +9,8 @@ from transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering,
     get_linear_schedule_with_warmup,
-    set_seed)
+    EvalPrediction,
+    set_seed, )
 
 from transformers.data.metrics.squad_metrics import (
     compute_predictions_logits,
@@ -23,7 +24,7 @@ import logging
 from tqdm.auto import tqdm
 from typing import List
 from dataclasses import dataclass
-from metrics import BaseMetric, klue_mrc_em
+from metrics import BaseMetric, klue_mrc_em, mrc_f1
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +52,11 @@ class Trainer(object):
         self.num_train_epochs = config.num_train_epochs
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
+        self.model_type = config.model_name_or_path.split("/")[1].split("-")[0]
 
         self.tokenizer = AutoTokenizer.from_pretrained(config.PLM)
-        self.model = AutoModelForQuestionAnswering.from_pretrained(config.PLM)
+        self.model = AutoModelForQuestionAnswering.from_pretrained(config.model_name_or_path)
+
         self.model.to(self.device)
 
     def train(self):
@@ -86,6 +89,15 @@ class Trainer(object):
         scheduler = get_linear_schedule_with_warmup(optimizer,
                                                     num_warmup_steps=self.config.warmup_steps,
                                                     num_training_steps=t_total)
+
+        if os.path.isfile(os.path.join(self.config.model_name_or_path, "optimizer.pt")) and os.path.isfile(
+                os.path.join(self.config.model_name_or_path, "scheduler.pt")
+        ):
+            # Load in optimizer and scheduler states
+            optimizer.load_state_dict(
+                torch.load(os.path.join(self.config.model_name_or_path, "optimizer.pt")))
+            scheduler.load_state_dict(
+                torch.load(os.path.join(self.config.model_name_or_path, "scheduler.pt")))
 
         self.model, optimizer, train_dataloader = self.accelerator.prepare(self.model, optimizer, train_dataloader)
 
@@ -138,6 +150,9 @@ class Trainer(object):
                 # check is_impossible values in dataset
                 # inputs.update({"is_impossible": batch[5]})
 
+                if self.model_type in ["distilbert", "roberta"]:
+                    del inputs["token_type_ids"]
+
                 if steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     continue
@@ -170,7 +185,10 @@ class Trainer(object):
                         if self.config.evaluate_during_training:
                             logger.info("***** Running Evaluation *****")
                             results = self.evaluate()
-                            logger.info(f"evaluate/EM = {results}")
+                            # for key, value in results.items():
+                            wandb.log({f"eval_EM": results})
+                            logger.info(f"eval_EM {results}")
+                            # logger.info(f"evaluate/EM = {results}")
 
                         logging_loss = tr_loss
 
@@ -219,6 +237,10 @@ class Trainer(object):
                     "attention_mask": batch[1],
                     "token_type_ids": batch[2],
                 }
+
+                if self.model_type in ["distilbert", "roberta"]:
+                    del inputs["token_type_ids"]
+
                 outputs = self.model(**inputs)
                 start_logits = outputs.start_logits
                 end_logits = outputs.end_logits
@@ -262,10 +284,13 @@ class Trainer(object):
         )
 
         em_result = self.metrics(predictions, examples)
-        logger.info("***** EM results *****")
-        logger.info(f"  EM = {em_result}")
-        wandb.log({"EM": em_result})
+        f1_result = mrc_f1(predictions, examples)
 
-        f1_results = squad_evaluate(preds=predictions, examples=examples)
+        eval_result = {"EM": em_result, "F1": f1_result}
 
-        return em_result
+        logger.info("***** EM / F1 results *****")
+        for key, value in eval_result.items():
+            logger.info(f"  {key} = {value}")
+
+        # wandb.log(eval_result)
+        return eval_result
