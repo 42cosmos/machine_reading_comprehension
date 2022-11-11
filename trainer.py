@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering,
+    AutoConfig,
     get_linear_schedule_with_warmup,
     EvalPrediction,
     set_seed, )
@@ -22,8 +23,6 @@ from accelerate import Accelerator
 
 import logging
 from tqdm.auto import tqdm
-from typing import List
-from dataclasses import dataclass
 from metrics import BaseMetric, klue_mrc_em, mrc_f1
 
 logger = logging.getLogger(__name__)
@@ -31,11 +30,6 @@ logger = logging.getLogger(__name__)
 
 def to_list(tensor):
     return tensor.detach().cpu().tolist()
-
-
-@dataclass
-class QAResults:
-    results: List[SquadResult]
 
 
 class Trainer(object):
@@ -47,15 +41,17 @@ class Trainer(object):
 
         self.accelerator = Accelerator(fp16=config.fp16)
         self.device = self.accelerator.device
+
         self.metrics = BaseMetric(klue_mrc_em)
 
         self.num_train_epochs = config.num_train_epochs
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
-        self.model_type = config.model_name_or_path.split("/")[1].split("-")[0]
 
         self.tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path)
-        self.model = AutoModelForQuestionAnswering.from_pretrained(config.model_name_or_path)
+        model_config = AutoConfig.from_pretrained(config.model_name_or_path)
+        self.model = AutoModelForQuestionAnswering.from_pretrained(config.model_name_or_path,
+                                                                   config=model_config)
 
         self.model.to(self.device)
 
@@ -117,6 +113,7 @@ class Trainer(object):
         if os.path.exists(self.config.model_name_or_path):
             try:
                 checkpoint_suffix = self.config.model_name_or_path.split("-")[-1].split("/")[0]
+                # suffix will be number int(90000)
                 global_step = int(checkpoint_suffix)
                 epochs_trained = global_step // (len(train_dataloader) // self.config.gradient_accumulation_steps)
                 steps_trained_in_current_epoch = global_step % (
@@ -150,7 +147,7 @@ class Trainer(object):
                 # check is_impossible values in dataset
                 # inputs.update({"is_impossible": batch[5]})
 
-                if self.model_type in ["distilbert", "roberta"]:
+                if not self.config.use_token_types:
                     del inputs["token_type_ids"]
 
                 if steps_trained_in_current_epoch > 0:
@@ -234,7 +231,7 @@ class Trainer(object):
                     "token_type_ids": batch[2],
                 }
 
-                if self.model_type in ["distilbert", "roberta"]:
+                if not self.config.use_token_types:
                     del inputs["token_type_ids"]
 
                 outputs = self.model(**inputs)
@@ -280,6 +277,7 @@ class Trainer(object):
         )
 
         f1_result = mrc_f1(predictions=predictions, examples=examples)
+        self.metrics(predictions, examples)
 
         logger.info("***** EM / F1 results *****")
         for key, value in f1_result.items():
