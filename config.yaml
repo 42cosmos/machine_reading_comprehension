@@ -5,6 +5,7 @@ CFG:
   output_dir: ./output
   data_dir: ./data
 
+  use_token_types: false
   max_seq_length: 512
   max_query_length: 64
   max_answer_length: 30
@@ -23,8 +24,8 @@ CFG:
   seed: 42
   max_grad_norm: 1.0
   warmup_steps: 20
-  logging_steps: 500
-  save_steps: 500
+  logging_steps: 100
+  save_steps: 100
   evaluate_during_training: true
   weight_decay: 0.01
 
@@ -32,7 +33,7 @@ CFG:
   gradient_accumulation_steps: 1
   n_best_size: 20
   null_score_diff_threshold: 0.0
-  version_2_with_negative: true
+  version_2_with_negative: false
   verbose_logging: true
   do_lower_case: true
 
