@@ -2,7 +2,8 @@ import os
 import yaml
 from easydict import EasyDict
 
-from klue_data_loader import KlueMRCProcessor
+from docent_data_loader import MRCProcessor
+# from klue_data_loader import MRCProcessor
 from trainer import Trainer
 
 import wandb
@@ -18,7 +19,9 @@ if __name__ == "__main__":
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
 
     args = parser.parse_args()
-
+    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
+                        datefmt='%m/%d/%Y %H:%M:%S',
+                        level=logging.INFO)
     logger = logging.getLogger(__name__)
     load_dotenv()
     WANDB_AUTH_KEY = os.getenv("WANDB_AUTH_KEY")
@@ -29,7 +32,7 @@ if __name__ == "__main__":
         hparams = EasyDict(saved_hparams)["CFG"]
     wandb.init(entity=hparams.entity_name, project=hparams.project_name, config=hparams)
 
-    processor = KlueMRCProcessor()
+    processor = MRCProcessor()
 
     train_dataset = processor.get_dataset(evaluate=False, output_examples=False)
     test_dataset, examples, features = processor.get_dataset(evaluate=True, output_examples=True)
