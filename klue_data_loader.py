@@ -24,7 +24,7 @@ class KlueMRCExample(SquadExample):
         self.question_type = question_type
 
 
-class KlueMRCProcessor:
+class MRCProcessor:
     def __init__(self):
         with open("config.yaml") as f:
             saved_hparams = yaml.load(f, Loader=yaml.FullLoader)
