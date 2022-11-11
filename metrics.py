@@ -133,13 +133,13 @@ def klue_mrc_em(preds: List[Dict[str, str]], examples: List[List[KlueMRCExample]
             ground_truths = [""]
 
         em_score, _ = compute_em_and_rouge_w_score_for_klue_mrc(prediction, ground_truths)
-        em_scores_per_question_type[example.question_type - 1].append(em_score)
+        em_scores_per_question_type[example.question_type].append(em_score)
 
     logger.info("** Exact Match(EM) scores by type **")
     for question_type in range(mrc_num_question_type):
         question_type_em_scores = em_scores_per_question_type[question_type]
         avg_em_score = np.mean(question_type_em_scores) * 100.0
-        logger.info(f"type{question_type + 1} ({len(question_type_em_scores)}): {avg_em_score:.4f}")
+        logger.info(f"type{question_type} ({len(question_type_em_scores)}): {avg_em_score:.4f}")
 
     total_em_scores = [score for scores in em_scores_per_question_type for score in scores]
     return np.mean(total_em_scores) * 100.0
