@@ -3,7 +3,9 @@ import logging
 
 import torch
 from torch.utils.data import Dataset
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
+
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +14,7 @@ class MRCLoader:
     def __init__(self,
                  config,
                  tokenizer):
+        self.raw_datasets = None
         self.config = config
         self.tokenizer = tokenizer
         self.pad_on_right = tokenizer.padding_side == "right"
@@ -19,19 +22,10 @@ class MRCLoader:
         self.answer_column_name = "answers"
         self.context_column_name = "context"
 
-        if self.config.dataset_name:
-            self.raw_datasets = load_dataset(
-                self.config.dataset_name,
-                self.config.task
-            )
-
-        else:
-            pass  # tbu.
-
     def get_dataset(self, file_path, evaluate=False, output_examples=False):
         dataset_type = "validation" if evaluate else "train"
-        cached_file_name = f"cached_{self.tokenizer.__class__.__name__}_{self.config.max_seq_length}_{dataset_type}"
-        cached_features_file = os.path.join(os.path.dirname(file_path), cached_file_name)
+        cached_file_name = f"cached_{self.config.dataset_name}_{self.config.max_seq_length}_{dataset_type}"
+        cached_features_file = os.path.join(file_path, cached_file_name)
 
         if os.path.exists(cached_features_file):
             logger.info(f"Loading features from cached file {cached_features_file}")
@@ -41,6 +35,15 @@ class MRCLoader:
                 examples_and_dataset["dataset"]
             )
         else:
+            if self.config.dataset_name == "klue":
+                self.raw_datasets = load_dataset(
+                    self.config.dataset_name,
+                    self.config.task
+                )
+
+            else:
+                self.raw_datasets = load_dataset(self.config.data_dir)
+
             logger.info(f"Creating features from dataset file at {self.config.data_dir}")
 
             examples, dataset = self._create_dataset(dataset_type)
@@ -56,6 +59,9 @@ class MRCLoader:
         feature_preparation = self.prepare_validation_features if dataset_type == "validation" else self.prepare_train_features
         examples = self.raw_datasets[dataset_type]
 
+        if self.config.dataset_name == "docent":
+            examples = self.make_dataset_from_docent(examples, dataset_type)
+
         dataset = examples.map(
             feature_preparation,
             batched=True,
@@ -63,17 +69,47 @@ class MRCLoader:
             desc=f"Running tokenizer on {dataset_type} dataset",
         )
 
-        # if self.config.max_samples is not None:
-        #     max_samples = min(len(dataset), self.config.max_samples)
-        #     dataset = dataset.select(range(max_samples))
-
         return examples, dataset
 
     # Training preprocessing
+    @staticmethod
+    def make_dataset_from_docent(docent_dataset, dataset_type):
+        examples = []
+        mode = True if dataset_type == "train" else False
+        for q in tqdm(docent_dataset):
+            context_id = q["id"]
+            context = q["explain"]
+            title = q["title"]
+
+            for qa in q["q&a"]:
+                id_ = f'{context_id}-{qa["QnAID"]}'
+                question = qa["Questions"]
+                answer_text = qa["Answer"].strip()
+                question_type = qa["Type"]
+                start_position_character = qa["StartPoint"]
+
+                answers = {"text": [answer_text], "answer_start": [start_position_character]}
+
+                if not mode:
+                    answer_text = None
+                    start_position_character = None
+
+                example = {
+                    "question_type": question_type,
+                    "guid": id_,
+                    "question": question,
+                    "answers": answers,
+                    "context": context,
+                    "answer_text": answer_text,
+                    "start_position_character": start_position_character,
+                    "title": title,
+                    "is_impossible": False,
+                }
+
+                examples.append(example)
+        return Dataset.from_list(examples)
+
     def prepare_train_features(self, examples):
-        # Some of the questions have lots of whitespace on the left, which is not useful and will make the
-        # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
-        # left whitespace
         examples[self.question_column_name] = [q.lstrip() for q in examples[self.question_column_name]]
 
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
@@ -148,6 +184,7 @@ class MRCLoader:
         return tokenized_examples
 
     # Validation preprocessing
+
     def prepare_validation_features(self, examples):
         # Some of the questions have lots of whitespace on the left, which is not useful and will make the
         # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
@@ -193,3 +230,4 @@ class MRCLoader:
             ]
 
         return tokenized_examples
+    # Docent-processing
