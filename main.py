@@ -36,14 +36,15 @@ def main(args):
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
+        level=logging.INFO
+        # handlers=[logging.StreamHandler(sys.stdout)],
     )
 
     wandb.init(project=hparams.project_name, entity=hparams.entity_name)
 
     # Detecting last checkpoint.
     last_checkpoint = None
-    if os.path.isdir(hparams.output_dir) and args.do_train:
+    if os.path.isdir(hparams.output_dir):
         last_checkpoint = get_last_checkpoint(hparams.output_dir)
         if last_checkpoint is None and len(os.listdir(hparams.output_dir)) > 0:
             raise ValueError(
@@ -55,6 +56,8 @@ def main(args):
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
+            hparams.model_name_or_path = last_checkpoint
+
     set_seed(hparams.seed)
 
     config = AutoConfig.from_pretrained(
