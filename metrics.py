@@ -86,7 +86,7 @@ def postprocess_qa_predictions(
         raise ValueError(f"Got {len(predictions[0])} predictions and {len(features)} features.")
 
     # Build a map example to its corresponding features.
-    example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
+    example_id_to_index = {k: i for i, k in enumerate(examples["guid"])}
     features_per_example = collections.defaultdict(list)
     for i, feature in enumerate(features):
         features_per_example[example_id_to_index[feature["example_id"]]].append(i)
@@ -202,7 +202,7 @@ def postprocess_qa_predictions(
 
         # Pick the best prediction. If the null answer is not possible, this is easy.
         if not version_2_with_negative:
-            all_predictions[example["id"]] = predictions[0]["text"]
+            all_predictions[example["guid"]] = predictions[0]["text"]
         else:
             # Otherwise we first need to find the best non-empty prediction.
             i = 0
@@ -212,14 +212,14 @@ def postprocess_qa_predictions(
 
             # Then we compare to the null prediction using the threshold.
             score_diff = null_score - best_non_null_pred["start_logit"] - best_non_null_pred["end_logit"]
-            scores_diff_json[example["id"]] = float(score_diff)  # To be JSON-serializable.
+            scores_diff_json[example["guid"]] = float(score_diff)  # To be JSON-serializable.
             if score_diff > null_score_diff_threshold:
-                all_predictions[example["id"]] = ""
+                all_predictions[example["guid"]] = ""
             else:
-                all_predictions[example["id"]] = best_non_null_pred["text"]
+                all_predictions[example["guid"]] = best_non_null_pred["text"]
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
-        all_nbest_json[example["id"]] = [
+        all_nbest_json[example["guid"]] = [
             {k: (float(v) if isinstance(v, (np.float16, np.float32, np.float64)) else v) for k, v in pred.items()}
             for pred in predictions
         ]
@@ -306,7 +306,7 @@ def postprocess_qa_predictions_with_beam_search(
         raise ValueError(f"Got {len(predictions[0])} predictions and {len(features)} features.")
 
     # Build a map example to its corresponding features.
-    example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
+    example_id_to_index = {k: i for i, k in enumerate(examples["guid"])}
     features_per_example = collections.defaultdict(list)
     for i, feature in enumerate(features):
         features_per_example[example_id_to_index[feature["example_id"]]].append(i)
@@ -408,12 +408,12 @@ def postprocess_qa_predictions_with_beam_search(
             pred["probability"] = prob
 
         # Pick the best prediction and set the probability for the null answer.
-        all_predictions[example["id"]] = predictions[0]["text"]
+        all_predictions[example["guid"]] = predictions[0]["text"]
         if version_2_with_negative:
-            scores_diff_json[example["id"]] = float(min_null_score)
+            scores_diff_json[example["guid"]] = float(min_null_score)
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
-        all_nbest_json[example["id"]] = [
+        all_nbest_json[example["guid"]] = [
             {k: (float(v) if isinstance(v, (np.float16, np.float32, np.float64)) else v) for k, v in pred.items()}
             for pred in predictions
         ]
