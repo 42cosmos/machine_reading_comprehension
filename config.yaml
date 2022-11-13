@@ -1,4 +1,4 @@
-dataset_name: klue
+dataset_name: docent
 task: mrc
 model_name_or_path: klue/bert-base
 data_dir: ./data
@@ -11,8 +11,8 @@ padding: max_length
 threads: 4
 
 stride: 128
-train_batch_size: 8
-eval_batch_size: 8
+train_batch_size: 32
+eval_batch_size: 32
 num_train_epochs: 5
 learning_rate: 5e-5
 adam_epsilon: 1e-8
