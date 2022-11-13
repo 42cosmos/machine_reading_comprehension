@@ -22,34 +22,39 @@ class MRCLoader:
         self.answer_column_name = "answers"
         self.context_column_name = "context"
 
-    def get_dataset(self, file_path, evaluate=False, output_examples=False):
+    def get_dataset(self, evaluate=False, output_examples=False):
         dataset_type = "validation" if evaluate else "train"
         cached_file_name = f"cached_{self.config.dataset_name}_{self.config.max_seq_length}_{dataset_type}"
-        cached_features_file = os.path.join(file_path, cached_file_name)
+        cached_features_file = os.path.join(self.config.data_dir, cached_file_name)
 
-        if os.path.exists(cached_features_file):
-            logger.info(f"Loading features from cached file {cached_features_file}")
-            examples_and_dataset = torch.load(cached_features_file)
-            examples, dataset = (
-                examples_and_dataset["examples"],
-                examples_and_dataset["dataset"]
-            )
+        if not os.path.exists(self.config.data_dir):
+            logger.info(f"Creating data directory: {self.config.data_dir}")
+            os.mkdir(self.config.data_dir)
+
         else:
-            if self.config.dataset_name == "klue":
-                self.raw_datasets = load_dataset(
-                    self.config.dataset_name,
-                    self.config.task
+            if os.path.exists(cached_features_file):
+                logger.info(f"Loading features from cached file {cached_features_file}")
+                examples_and_dataset = torch.load(cached_features_file)
+                examples, dataset = (
+                    examples_and_dataset["examples"],
+                    examples_and_dataset["dataset"]
                 )
-
             else:
-                self.raw_datasets = load_dataset(self.config.data_dir)
+                if self.config.dataset_name == "klue":
+                    self.raw_datasets = load_dataset(
+                        self.config.dataset_name,
+                        self.config.task
+                    )
 
-            logger.info(f"Creating features from dataset file at {self.config.data_dir}")
+                else:
+                    self.raw_datasets = load_dataset(self.config.data_dir)
 
-            examples, dataset = self._create_dataset(dataset_type)
+                logger.info(f"Creating features from dataset file at {self.config.data_dir}")
 
-            logger.info(f"Saving features into cached file {cached_features_file}")
-            torch.save({"dataset": dataset, "examples": examples}, cached_features_file)
+                examples, dataset = self._create_dataset(dataset_type)
+
+                logger.info(f"Saving features into cached file {cached_features_file}")
+                torch.save({"dataset": dataset, "examples": examples}, cached_features_file)
 
         if output_examples:
             return examples, dataset
