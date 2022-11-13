@@ -470,7 +470,7 @@ def post_processing_function(examples, features, predictions, stage="eval"):
     else:
         formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
 
-    references = [{"id": ex["id"], "answers": ex["answers"]} for ex in examples]
+    references = [{"id": ex["guid"], "answers": ex["answers"]} for ex in examples]
     return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
 
