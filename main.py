@@ -79,8 +79,10 @@ def main(args):
 
     loader = MRCLoader(hparams, tokenizer)
 
-    train_dataset = loader.get_dataset(hparams.data_dir, evaluate=False, output_examples=False)
-    eval_examples, eval_dataset = loader.get_dataset(hparams.data_dir, evaluate=True, output_examples=True)
+    if args.do_train:
+        train_dataset = loader.get_dataset(hparams.data_dir, evaluate=False, output_examples=False)
+    if args.do_eval:
+        eval_examples, eval_dataset = loader.get_dataset(hparams.data_dir, evaluate=True, output_examples=True)
 
     wandb.watch(model, log="all", log_freq=100)
     trainer = QuestionAnsweringTrainer(
