@@ -1,42 +1,48 @@
-CFG:
-  dset_name: klue
-  task: mrc
-  model_name_or_path: klue/roberta-large
-  output_dir: ./output
-  data_dir: ./data
+dataset_name: klue
+task: mrc
+model_name_or_path: klue/bert-base
+data_dir: ./data
+output_dir: ./output
 
-  use_token_types: false
-  max_seq_length: 512
-  max_query_length: 64
-  max_answer_length: 30
-  truncation: only_second
-  padding: max_length
-  threads: 4
+use_token_types: false
+max_query_length: 64
+truncation: only_second
+padding: max_length
+threads: 4
 
-  stride: 128
-  doc_stride: 128
-  train_batch_size: 8
-  eval_batch_size: 8
-  num_train_epochs: 5
-  learning_rate: 5e-5
-  adam_epsilon: 1e-8
-  fp16: true
-  seed: 42
-  max_grad_norm: 1.0
-  warmup_steps: 20
-  logging_steps: 100
-  save_steps: 100
-  evaluate_during_training: true
-  weight_decay: 0.01
+stride: 128
+train_batch_size: 8
+eval_batch_size: 8
+num_train_epochs: 5
+learning_rate: 5e-5
+adam_epsilon: 1e-8
+fp16: true
+seed: 42
+max_grad_norm: 1.0
+warmup_steps: 20
+logging_steps: 100
+save_steps: 100
+evaluate_during_training: true
+weight_decay: 0.01
 
-  max_steps: -1
-  gradient_accumulation_steps: 1
-  n_best_size: 20
-  null_score_diff_threshold: 0.0
-  version_2_with_negative: false
-  verbose_logging: true
-  do_lower_case: true
+max_steps: -1
+gradient_accumulation_steps: 1
 
-  # wandb setting
-  entity_name: cosmos42
-  project_name: machine-reading-comprehension
+null_score_diff_threshold: 0.0
+verbose_logging: true
+do_lower_case: true
+
+push_to_hub: false
+model_revision: main
+preprocessing_num_workers: null
+max_seq_length: 384
+pad_to_max_length: true
+version_2_with_negative: false
+doc_stride: 128
+n_best_size: 20
+max_answer_length: 30
+resume_from_checkpoint: null
+
+# wandb setting
+entity_name: cosmos42
+project_name: machine-reading-comprehension
