@@ -28,6 +28,10 @@ from tqdm.auto import tqdm
 from transformers import EvalPrediction
 import evaluate
 
+import re
+import string
+from collections import Counter
+
 logger = logging.getLogger(__name__)
 with open("config.yaml") as f:
     config = EasyDict(yaml.load(f, Loader=yaml.FullLoader))
@@ -479,3 +483,94 @@ metric = evaluate.load("squad_v2" if config.version_2_with_negative else "squad"
 
 def compute_metrics(p: EvalPrediction):
     return metric.compute(predictions=p.predictions, references=p.label_ids)
+
+
+# these functions are heavily influenced by the HF squad_metrics.py script
+def normalize_text(s):
+    """Removing articles and punctuation, and standardizing whitespace are all typical text processing steps."""
+    import string, re
+
+    def remove_articles(text):
+        regex = re.compile(r"\b(a|an|the)\b", re.UNICODE)
+        return re.sub(regex, " ", text)
+
+    def white_space_fix(text):
+        return " ".join(text.split())
+
+    def remove_punc(text):
+        exclude = set(string.punctuation)
+        return "".join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_articles(remove_punc(lower(s))))
+
+
+def normalize_answer(s):
+    def remove_(text):
+        ''' 불필요한 기호 제거 '''
+        text = re.sub("'", " ", text)
+        text = re.sub('"', " ", text)
+        text = re.sub('《', " ", text)
+        text = re.sub('》', " ", text)
+        text = re.sub('<', " ", text)
+        text = re.sub('>', " ", text)
+        text = re.sub('〈', " ", text)
+        text = re.sub('〉', " ", text)
+        text = re.sub("\(", " ", text)
+        text = re.sub("\)", " ", text)
+        text = re.sub("‘", " ", text)
+        text = re.sub("’", " ", text)
+        return text
+
+    def white_space_fix(text):
+        return ' '.join(text.split())
+
+    def remove_punc(text):
+        exclude = set(string.punctuation)
+        return ''.join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_punc(lower(remove_(s))))
+
+
+def f1_score(prediction, ground_truth):
+    prediction_tokens = normalize_answer(prediction).split()
+    ground_truth_tokens = normalize_answer(ground_truth).split()
+
+    # F1 by character
+    prediction_Char = []
+    for tok in prediction_tokens:
+        now = [a for a in tok]
+        prediction_Char.extend(now)
+
+    ground_truth_Char = []
+    for tok in ground_truth_tokens:
+        now = [a for a in tok]
+        ground_truth_Char.extend(now)
+
+    common = Counter(prediction_Char) & Counter(ground_truth_Char)
+    num_same = sum(common.values())
+    if num_same == 0:
+        return 0
+
+    precision = 1.0 * num_same / len(prediction_Char)
+    recall = 1.0 * num_same / len(ground_truth_Char)
+    f1 = (2 * precision * recall) / (precision + recall)
+
+    return f1
+
+
+def f1_by_character(examples, predictions: dict):
+    f1 = 0
+
+    for ex in examples:
+        q_id = ex["guid"]
+        ground_truth = ex["answers"]["text"][0]
+        pred = predictions[q_id]
+        f1 += f1_score(pred, ground_truth)
+
+    return f1 / examples.num_rows
