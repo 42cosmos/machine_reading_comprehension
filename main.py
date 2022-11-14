@@ -60,10 +60,27 @@ def main(args):
 
     set_seed(hparams.seed)
 
-    config = AutoConfig.from_pretrained(
-        hparams.model_name_or_path,
-        revision=hparams.model_revision,
+    training_args = TrainingArguments(
+        output_dir=hparams.output_dir,
+        do_train=args.do_train,
+        do_eval=args.do_eval,
+        evaluation_strategy="epoch",
+        save_strategy="epoch",
+        per_device_train_batch_size=hparams.train_batch_size,
+        per_device_eval_batch_size=hparams.eval_batch_size,
+        learning_rate=hparams.learning_rate,
+        adam_epsilon=hparams.adam_epsilon,
+        num_train_epochs=hparams.num_train_epochs,
+        weight_decay=hparams.weight_decay,
+        logging_steps=hparams.logging_steps,
+        seed=hparams.seed,
+        fp16=hparams.fp16,
+        warmup_steps=hparams.warmup_steps,
+        max_steps=hparams.max_steps,
+        log_level="info",
+        report_to="wandb",
     )
+
     tokenizer = AutoTokenizer.from_pretrained(
         hparams.model_name_or_path,
         revision=hparams.model_revision,
@@ -72,6 +89,7 @@ def main(args):
     model = AutoModelForQuestionAnswering.from_pretrained(
         hparams.model_name_or_path,
         revision=hparams.model_revision,
+        config=training_args,
     )
 
     data_collator = (
@@ -80,12 +98,13 @@ def main(args):
         else DataCollatorWithPadding(tokenizer, pad_to_multiple_of=8 if hparams.fp16 else None)
     )
 
-    loader = MRCLoader(hparams, tokenizer)
+    loader = MRCLoader(hparams)
 
     if args.do_train:
-        train_dataset = loader.get_dataset(hparams.data_dir, evaluate=False, output_examples=False)
+        train_dataset = loader.get_dataset(evaluate=False, output_examples=False)
+
     if args.do_eval:
-        eval_examples, eval_dataset = loader.get_dataset(hparams.data_dir, evaluate=True, output_examples=True)
+        eval_examples, eval_dataset = loader.get_dataset(evaluate=True, output_examples=True)
 
     wandb.watch(model, log="all", log_freq=100)
     trainer = QuestionAnsweringTrainer(
@@ -111,7 +130,6 @@ def main(args):
 
         metrics = train_result.metrics
         metrics["train_samples"] = len(train_dataset)
-        wandb.log(train_result)
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
@@ -129,11 +147,6 @@ def main(args):
     kwargs = {"finetuned_from": hparams.model_name_or_path, "tasks": "question-answering"}
     if hparams.dataset_name:
         kwargs["dataset_tags"] = hparams.dataset_name
-
-    if hparams.push_to_hub:
-        trainer.push_to_hub(**kwargs)
-    else:
-        trainer.create_model_card(**kwargs)
 
 
 if __name__ == "__main__":
