@@ -17,7 +17,7 @@ if __name__ == '__main__':
         config = EasyDict(yaml.load(f, Loader=yaml.FullLoader))
 
     loader = MRCLoader(config)
-    examples, _ = loader.get_dataset(evaluate=False, output_examples=True)
+    examples, _ = loader.get_dataset(evaluate=True, output_examples=True)
 
     with open(args.prediction_file) as prediction_file:
         predictions = json.load(prediction_file)
