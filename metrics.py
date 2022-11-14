@@ -478,15 +478,12 @@ def post_processing_function(examples, features, predictions, stage="eval"):
     return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
 
-metric = evaluate.load("squad_v2" if config.version_2_with_negative else "squad")
-
-
 def compute_metrics(p: EvalPrediction):
     return metric.compute(predictions=p.predictions, references=p.label_ids)
 
 
 # these functions are heavily influenced by the HF squad_metrics.py script
-def normalize_text(s):
+def normalize_answer(s):
     """Removing articles and punctuation, and standardizing whitespace are all typical text processing steps."""
     import string, re
 
@@ -494,20 +491,6 @@ def normalize_text(s):
         regex = re.compile(r"\b(a|an|the)\b", re.UNICODE)
         return re.sub(regex, " ", text)
 
-    def white_space_fix(text):
-        return " ".join(text.split())
-
-    def remove_punc(text):
-        exclude = set(string.punctuation)
-        return "".join(ch for ch in text if ch not in exclude)
-
-    def lower(text):
-        return text.lower()
-
-    return white_space_fix(remove_articles(remove_punc(lower(s))))
-
-
-def normalize_answer(s):
     def remove_(text):
         ''' 불필요한 기호 제거 '''
         text = re.sub("'", " ", text)
@@ -525,16 +508,16 @@ def normalize_answer(s):
         return text
 
     def white_space_fix(text):
-        return ' '.join(text.split())
+        return " ".join(text.split())
 
     def remove_punc(text):
         exclude = set(string.punctuation)
-        return ''.join(ch for ch in text if ch not in exclude)
+        return "".join(ch for ch in text if ch not in exclude)
 
     def lower(text):
         return text.lower()
 
-    return white_space_fix(remove_punc(lower(remove_(s))))
+    return white_space_fix(remove_articles(remove_punc(lower(remove_(s)))))
 
 
 def f1_score(prediction, ground_truth):
@@ -570,7 +553,8 @@ def f1_by_character(examples, predictions: dict):
     for ex in examples:
         q_id = ex["guid"]
         ground_truth = ex["answers"]["text"][0]
-        pred = predictions[q_id]
-        f1 += f1_score(pred, ground_truth)
+        if q_id in predictions.keys():
+            pred = predictions[q_id]
+            f1 += f1_score(pred, ground_truth)
 
-    return f1 / examples.num_rows
+    return {"char-f1": f1 / examples.num_rows}
