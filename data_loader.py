@@ -7,54 +7,51 @@ from datasets import load_dataset, Dataset
 
 from tqdm.auto import tqdm
 
+from transformers import AutoTokenizer
+
 logger = logging.getLogger(__name__)
 
 
 class MRCLoader:
     def __init__(self,
-                 config,
-                 tokenizer):
+                 config):
         self.raw_datasets = None
         self.config = config
-        self.tokenizer = tokenizer
-        self.pad_on_right = tokenizer.padding_side == "right"
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.model_name_or_path)
+        self.pad_on_right = self.tokenizer.padding_side == "right"
         self.question_column_name = "question"
         self.answer_column_name = "answers"
         self.context_column_name = "context"
 
     def get_dataset(self, evaluate=False, output_examples=False):
         dataset_type = "validation" if evaluate else "train"
-        cached_file_name = f"cached_{self.config.dataset_name}_{self.config.max_seq_length}_{dataset_type}"
+        model_info = self.config.model_name_or_path.split("/")[-1]
+        cached_file_name = f"cached_{self.config.dataset_name}_{model_info}_{self.config.max_seq_length}_{dataset_type}"
         cached_features_file = os.path.join(self.config.data_dir, cached_file_name)
 
-        if not os.path.exists(self.config.data_dir):
-            logger.info(f"Creating data directory: {self.config.data_dir}")
-            os.mkdir(self.config.data_dir)
-
+        if os.path.exists(cached_features_file):
+            logger.info(f"Loading features from cached file {cached_features_file}")
+            examples_and_dataset = torch.load(cached_features_file)
+            examples, dataset = (
+                examples_and_dataset["examples"],
+                examples_and_dataset["dataset"]
+            )
         else:
-            if os.path.exists(cached_features_file):
-                logger.info(f"Loading features from cached file {cached_features_file}")
-                examples_and_dataset = torch.load(cached_features_file)
-                examples, dataset = (
-                    examples_and_dataset["examples"],
-                    examples_and_dataset["dataset"]
-                )
+            if self.config.dataset_name == "docent":
+                self.raw_datasets = load_dataset(self.config.data_dir)
+
             else:
-                if self.config.dataset_name == "klue":
-                    self.raw_datasets = load_dataset(
-                        self.config.dataset_name,
-                        self.config.task
-                    )
+                self.raw_datasets = load_dataset(
+                    self.config.dataset_name,
+                    self.config.task
+                )
 
-                else:
-                    self.raw_datasets = load_dataset(self.config.data_dir)
+            logger.info(f"Creating features from dataset file at {self.config.data_dir}")
 
-                logger.info(f"Creating features from dataset file at {self.config.data_dir}")
+            examples, dataset = self._create_dataset(dataset_type)
 
-                examples, dataset = self._create_dataset(dataset_type)
-
-                logger.info(f"Saving features into cached file {cached_features_file}")
-                torch.save({"dataset": dataset, "examples": examples}, cached_features_file)
+            logger.info(f"Saving features into cached file {cached_features_file}")
+            torch.save({"dataset": dataset, "examples": examples}, cached_features_file)
 
         if output_examples:
             return examples, dataset
@@ -128,6 +125,7 @@ class MRCLoader:
             stride=self.config.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
+            return_token_type_ids=False,
             padding="max_length" if self.config.pad_to_max_length else False,
         )
 
@@ -207,6 +205,7 @@ class MRCLoader:
             stride=self.config.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
+            return_token_type_ids=False,
             padding="max_length" if self.config.pad_to_max_length else False,
         )
 
