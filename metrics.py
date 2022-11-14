@@ -477,7 +477,7 @@ def post_processing_function(examples, features, predictions, stage="eval"):
     references = [{"id": ex["guid"], "answers": ex["answers"]} for ex in examples]
     return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
-
+metric = evaluate.load("squad")
 def compute_metrics(p: EvalPrediction):
     return metric.compute(predictions=p.predictions, references=p.label_ids)
 
