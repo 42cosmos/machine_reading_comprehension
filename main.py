@@ -68,8 +68,8 @@ def main(args):
         save_strategy="epoch",
         per_device_train_batch_size=hparams.train_batch_size,
         per_device_eval_batch_size=hparams.eval_batch_size,
-        learning_rate=hparams.learning_rate,
-        adam_epsilon=hparams.adam_epsilon,
+        learning_rate=float(hparams.learning_rate),
+        adam_epsilon=float(hparams.adam_epsilon),
         num_train_epochs=hparams.num_train_epochs,
         weight_decay=hparams.weight_decay,
         logging_steps=hparams.logging_steps,
@@ -89,7 +89,6 @@ def main(args):
     model = AutoModelForQuestionAnswering.from_pretrained(
         hparams.model_name_or_path,
         revision=hparams.model_revision,
-        config=training_args,
     )
 
     data_collator = (
@@ -109,6 +108,7 @@ def main(args):
     wandb.watch(model, log="all", log_freq=100)
     trainer = QuestionAnsweringTrainer(
         model=model,
+        args=training_args,
         train_dataset=train_dataset if args.do_train else None,
         eval_dataset=eval_dataset if args.do_eval else None,
         eval_examples=eval_examples if args.do_eval else None,
