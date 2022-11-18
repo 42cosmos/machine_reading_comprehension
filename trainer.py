@@ -20,6 +20,7 @@ from transformers import Trainer
 from transformers.trainer_utils import PredictionOutput
 import wandb
 
+
 class QuestionAnsweringTrainer(Trainer):
     def __init__(self, *args, eval_examples=None, post_process_function=None, **kwargs):
         super().__init__(*args, **kwargs)
