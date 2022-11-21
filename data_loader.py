@@ -43,8 +43,12 @@ class MRCLoader:
             else:
                 self.raw_datasets = load_dataset(
                     self.config.dataset_name,
-                    self.config.task
+                    self.config.task if self.config.dataset_name == "klue" else None
                 )
+
+                if self.config.dataset_name.startswith("squad"):
+                    self.raw_dataset = self.raw_dataset.rename_column("id", "guid")
+
 
             logger.info(f"Creating features from dataset file at {self.config.data_dir}")
 
