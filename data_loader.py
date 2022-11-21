@@ -47,7 +47,7 @@ class MRCLoader:
                 )
 
                 if self.config.dataset_name.startswith("squad"):
-                    self.raw_dataset = self.raw_dataset.rename_column("id", "guid")
+                    self.raw_datasets = self.raw_datasets.rename_column("id", "guid")
 
 
             logger.info(f"Creating features from dataset file at {self.config.data_dir}")
