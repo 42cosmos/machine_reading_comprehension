@@ -453,7 +453,7 @@ def postprocess_qa_predictions_with_beam_search(
 
 
 # Post-processing:
-def post_processing_function(examples, features, predictions, stage="eval"):
+def post_processing_function(examples, features, predictions):
     # Post-processing: we match the start logits and end logits to answers in the original context.
     predictions = postprocess_qa_predictions(
         examples=examples,
@@ -464,7 +464,7 @@ def post_processing_function(examples, features, predictions, stage="eval"):
         max_answer_length=config.max_answer_length,
         null_score_diff_threshold=config.null_score_diff_threshold,
         output_dir=config.output_dir,
-        prefix=stage,
+        prefix=config.dataset_name,
     )
     # Format the result to the format the metric expects.
     if config.version_2_with_negative:
