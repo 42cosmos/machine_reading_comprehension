@@ -42,21 +42,23 @@ def main(args):
 
     wandb.init(project=hparams.project_name, entity=hparams.entity_name)
 
-    # Detecting last checkpoint.
-    last_checkpoint = None
-    if os.path.isdir(hparams.output_dir):
-        last_checkpoint = get_last_checkpoint(hparams.output_dir)
-        if last_checkpoint is None and len(os.listdir(hparams.output_dir)) > 0:
-            raise ValueError(
-                f"Output directory ({hparams.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome."
-            )
-        elif last_checkpoint is not None and hparams.resume_from_checkpoint is None:
-            logger.info(
-                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-            )
-            hparams.model_name_or_path = last_checkpoint
+    if args.load_checkpoint:
+        last_checkpoint = None
+        if os.path.exists(hparams.output_dir):
+            last_checkpoint = get_last_checkpoint(hparams.output_dir)
+            if last_checkpoint is not None:
+                logger.info(f"Checkpoint detected. Resuming from {last_checkpoint}")
+                hparams.model_name_or_path = last_checkpoint
+            else:
+                logger.info(f"No checkpoint found, training from scratch: {hparams.model_name_or_path}")
+
+        if not os.path.exists(hparams.output_dir):
+            os.makedirs(hparams.output_dir)
+
+    elif not args.load_checkpoint:
+        if os.path.exists(hparams.output_dir) and len(os.listdir(hparams.output_dir)) > 1:
+            hparams.model_name_or_path = hparams.output_dir
+            logger.info(f"***** Load Model from {hparams.model_name_or_path} *****")
 
     set_seed(hparams.seed)
 
@@ -154,6 +156,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
+    parser.add_argument("--load_checkpoint", action="store_true")
 
     args = parser.parse_args()
 
