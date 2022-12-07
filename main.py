@@ -22,7 +22,6 @@ from transformers.trainer_utils import get_last_checkpoint
 
 from data_loader import MRCLoader
 from metrics import post_processing_function, compute_metrics
-import wandb
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,6 @@ def main(args):
         # handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    wandb.init(project=hparams.project_name, entity=hparams.entity_name)
 
     if args.load_checkpoint:
         last_checkpoint = None
@@ -80,7 +78,6 @@ def main(args):
         warmup_steps=hparams.warmup_steps,
         max_steps=hparams.max_steps,
         log_level="info",
-        report_to="wandb",
     )
 
     tokenizer = AutoTokenizer.from_pretrained(
@@ -107,7 +104,6 @@ def main(args):
     if args.do_eval:
         eval_examples, eval_dataset = loader.get_dataset(evaluate=True, output_examples=True)
 
-    wandb.watch(model, log="all", log_freq=100)
     trainer = QuestionAnsweringTrainer(
         model=model,
         args=training_args,

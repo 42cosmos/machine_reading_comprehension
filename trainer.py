@@ -18,7 +18,6 @@ A subclass of `Trainer` specific to Question-Answering tasks
 
 from transformers import Trainer
 from transformers.trainer_utils import PredictionOutput
-import wandb
 
 
 class QuestionAnsweringTrainer(Trainer):
@@ -62,7 +61,6 @@ class QuestionAnsweringTrainer(Trainer):
         if self.args.should_log:
             # Only the main node log the results by default
             self.log(metrics)
-        wandb.log(metrics)
 
         self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, metrics)
         return metrics
