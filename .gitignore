@@ -4,6 +4,7 @@
 .DS_Store
 __pycache__/
 data/
+mrc_data/
 .ipynb
 output/
 wandb/
