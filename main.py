@@ -31,14 +31,14 @@ def main(args):
         saved_config = yaml.load(f, Loader=yaml.FullLoader)
         hparams = EasyDict(saved_config)
 
+    hparams.dataset_name = args.dset_name
+
     # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO
-        # handlers=[logging.StreamHandler(sys.stdout)],
     )
-
 
     if args.load_checkpoint:
         last_checkpoint = None
@@ -118,13 +118,8 @@ def main(args):
 
     # Training
     if args.do_train:
-        checkpoint = None
-        if hparams.resume_from_checkpoint is not None:
-            checkpoint = hparams.resume_from_checkpoint
-        elif last_checkpoint is not None:
-            checkpoint = last_checkpoint
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+        train_result = trainer.train()
+        trainer.save_model()
 
         metrics = train_result.metrics
         metrics["train_samples"] = len(train_dataset)
@@ -153,6 +148,8 @@ if __name__ == "__main__":
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
     parser.add_argument("--load_checkpoint", action="store_true")
+    parser.add_argument("--dset_name", default="klue", help="dataset name you want to use",
+                        choices=["klue", "squad_kor_v1", "docent"])
 
     args = parser.parse_args()
 
