@@ -1,8 +1,7 @@
-dataset_name: docent
 task: mrc
-model_name_or_path: klue/bert-base
+model_name_or_path: monologg/koelectra-base-v3-discriminator
 data_dir: ./data
-output_dir: ./output
+output_dir: ./model
 
 use_token_types: false
 max_query_length: 64
@@ -13,7 +12,7 @@ threads: 4
 stride: 128
 train_batch_size: 32
 eval_batch_size: 32
-num_train_epochs: 5
+num_train_epochs: 12
 learning_rate: 5e-5
 adam_epsilon: 1e-8
 fp16: true
@@ -32,7 +31,6 @@ null_score_diff_threshold: 0.0
 verbose_logging: true
 do_lower_case: true
 
-push_to_hub: false
 model_revision: main
 preprocessing_num_workers: null
 max_seq_length: 384
@@ -41,8 +39,3 @@ version_2_with_negative: false
 doc_stride: 128
 n_best_size: 20
 max_answer_length: 30
-resume_from_checkpoint: null
-
-# wandb setting
-entity_name: cosmos42
-project_name: machine-reading-comprehension
