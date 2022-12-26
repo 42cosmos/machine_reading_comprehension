@@ -1,9 +1,10 @@
+dataset_name: klue
 task: mrc
 model_name_or_path: monologg/koelectra-base-v3-discriminator
-data_dir: ./data
+data_dir: ./mrc_data
 output_dir: ./model
 
-use_token_types: false
+use_token_types: true
 max_query_length: 64
 truncation: only_second
 padding: max_length
