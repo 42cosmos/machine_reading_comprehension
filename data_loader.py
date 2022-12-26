@@ -25,8 +25,7 @@ class MRCLoader:
 
     def get_dataset(self, evaluate=False, output_examples=False):
         dataset_type = "validation" if evaluate else "train"
-        model_info = self.config.model_name_or_path.split("/")[-1]
-        cached_file_name = f"cached_{self.config.dataset_name}_{model_info}_{self.config.max_seq_length}_{dataset_type}"
+        cached_file_name = f"cached_{self.config.dataset_name}_{dataset_type}"
         cached_features_file = os.path.join(self.config.data_dir, cached_file_name)
 
         if os.path.exists(cached_features_file):
@@ -48,7 +47,6 @@ class MRCLoader:
 
                 if self.config.dataset_name.startswith("squad"):
                     self.raw_datasets = self.raw_datasets.rename_column("id", "guid")
-
 
             logger.info(f"Creating features from dataset file at {self.config.data_dir}")
 
@@ -129,7 +127,7 @@ class MRCLoader:
             stride=self.config.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=False,
+            return_token_type_ids=True if self.config.use_token_types else False,
             padding="max_length" if self.config.pad_to_max_length else False,
         )
 
@@ -209,7 +207,7 @@ class MRCLoader:
             stride=self.config.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=False,
+            return_token_type_ids=True if self.config.use_token_types else False,
             padding="max_length" if self.config.pad_to_max_length else False,
         )
 
