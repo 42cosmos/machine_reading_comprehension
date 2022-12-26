@@ -31,8 +31,6 @@ def main(args):
         saved_config = yaml.load(f, Loader=yaml.FullLoader)
         hparams = EasyDict(saved_config)
 
-    hparams.dataset_name = args.dset_name
-
     # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -148,8 +146,6 @@ if __name__ == "__main__":
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
     parser.add_argument("--load_checkpoint", action="store_true")
-    parser.add_argument("--dset_name", default="klue", help="dataset name you want to use",
-                        choices=["klue", "squad_kor_v1", "docent"])
 
     args = parser.parse_args()
 
