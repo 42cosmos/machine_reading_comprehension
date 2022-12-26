@@ -482,7 +482,8 @@ metric = evaluate.load("squad")
 
 
 def compute_metrics(p: EvalPrediction):
-    return metric.compute(predictions=p.predictions, references=p.label_ids)
+    return {**metric.compute(predictions=p.predictions, references=p.label_ids),
+            **f1_by_character(predictions=p.predictions, examples=p.label_ids)}
 
 
 # these functions are heavily influenced by the HF squad_metrics.py script
@@ -553,11 +554,14 @@ def f1_score(prediction, ground_truth):
 def f1_by_character(examples, predictions: dict):
     f1 = 0
 
-    for ex in examples:
-        q_id = ex["guid"]
-        ground_truth = ex["answers"]["text"][0]
-        if q_id in predictions.keys():
-            pred = predictions[q_id]
-            f1 += f1_score(pred, ground_truth)
+    preds = {values["id"]: values["prediction_text"] for values in predictions}
+    refs = {ex["id"]: ex["answers"]["text"][0] for ex in examples}
 
-    return {"char-f1": f1 / examples.num_rows}
+    for ex_k, ex_v in refs.items():
+        q_id = ex_k
+        ground_truth = ex_v
+        if q_id in preds.keys():
+            model_pred = preds[q_id]
+            f1 += f1_score(model_pred, ground_truth)
+
+    return {"char-f1": f1 / len(examples)}
