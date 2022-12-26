@@ -1,0 +1,13 @@
+accelerate==0.13.2
+awscli==1.27.27
+datasets==2.6.1
+easydict==1.10
+PyYAML==5.4.1
+pandas==1.5.1
+transformers==4.23.1
+tqdm==4.62.3
+evaluate==0.3.0
+tokenizers==0.13.1
+numpy==1.21.2
+python-dotenv==0.21.0
+seqeval==1.2.2
