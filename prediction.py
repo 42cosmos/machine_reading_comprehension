@@ -8,17 +8,15 @@ from metrics import f1_score
 from data_loader import MRCLoader
 
 
-def f1_by_character(examples, predictions: dict):
+def f1_by_character(predictions: dict):
     f1 = 0
 
-    for ex in examples:
-        q_id = ex["guid"]
-        ground_truth = ex["answers"]["text"][0]
-        if q_id in predictions.keys():
-            pred = predictions[q_id]
-            f1 += f1_score(pred, ground_truth)
+    for q_id, value in predictions.items():
+        ground_truth = value["original_text"][0]
+        pred = value["predictions"][0]
+        f1 += f1_score(pred, ground_truth)
 
-    return {"char-f1": f1 / examples.num_rows}
+    return {"char-f1": f1 / len(predictions)}
 
 
 if __name__ == '__main__':
@@ -33,10 +31,7 @@ if __name__ == '__main__':
     dset_name = args.prediction_file.split('/')[-1].split('_')[0]
     config.dataset_name = dset_name
 
-    loader = MRCLoader(config)
-    examples, _ = loader.get_dataset(evaluate=True, output_examples=True)
-
     with open(args.prediction_file) as prediction_file:
         predictions = json.load(prediction_file)
 
-    print(f1_by_character(examples=examples, predictions=predictions))
+    print(f1_by_character(predictions))
