@@ -22,7 +22,7 @@ def f1_by_character(predictions: dict):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Evaluation')
-    parser.add_argument('--prediction_file', help='Prediction File')  # output/{dset_name}_predictions.json
+    parser.add_argument('--prediction_file', help='Prediction File')  # model/{dset_name}_predictions.json
     args = parser.parse_args()
 
     with open("config.yaml") as f:
