@@ -25,12 +25,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     vim \
     wget
 
-RUN addgroup -g 999 eunbinpark
-RUN adduser --ingroup eunbinpark --disabled-password --gecos '' eunbinpark
-#  유저그룹이름
-
-USER eunbinpark
-
 
 RUN rm -rf /var/lib/apt/lists/*
 
