@@ -97,10 +97,10 @@ def main(args):
     loader = MRCLoader(hparams)
 
     if args.do_train:
-        train_dataset = loader.get_dataset(evaluate=False, output_examples=False)
+        train_dataset = loader.get_dataset(dataset_type="train", output_examples=False)
 
     if args.do_eval:
-        eval_examples, eval_dataset = loader.get_dataset(evaluate=True, output_examples=True)
+        eval_examples, eval_dataset = loader.get_dataset(dataset_type="validation", output_examples=True)
 
     trainer = QuestionAnsweringTrainer(
         model=model,
