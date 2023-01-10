@@ -109,8 +109,6 @@ if __name__ == '__main__':
     trainer = QuestionAnsweringTrainer(
         model=model,
         args=training_args,
-        eval_dataset=test_dataset,
-        eval_examples=test_examples,
         tokenizer=tokenizer,
         data_collator=data_collator,
         post_process_function=post_processing_function,
@@ -118,6 +116,7 @@ if __name__ == '__main__':
     )
 
 
-    result = trainer.evaluate(eval_dataset=test_dataset, eval_examples=test_examples)
-    for k, v in result.items():
+    outputs = trainer.predict(predict_dataset=test_dataset, predict_examples=test_example, )
+    results = compute_metrics(outputs)
+    for k, v in results.items():
         logger.info(f"{k}, {v}")
