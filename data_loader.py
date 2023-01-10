@@ -23,8 +23,7 @@ class MRCLoader:
         self.answer_column_name = "answers"
         self.context_column_name = "context"
 
-    def get_dataset(self, evaluate=False, output_examples=False):
-        dataset_type = "validation" if evaluate else "train"
+    def get_dataset(self, dataset_type="train", output_examples=False):
         cached_file_name = f"cached_{self.config.dataset_name}_{dataset_type}"
         cached_features_file = os.path.join(self.config.data_dir, cached_file_name)
 
@@ -60,7 +59,7 @@ class MRCLoader:
         return dataset
 
     def _create_dataset(self, dataset_type):
-        feature_preparation = self.prepare_validation_features if dataset_type == "validation" else self.prepare_train_features
+        feature_preparation = self.prepare_validation_features if dataset_type != "train" else self.prepare_train_features
         examples = self.raw_datasets[dataset_type]
 
         if self.config.dataset_name == "docent":
