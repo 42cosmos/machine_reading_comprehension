@@ -116,7 +116,7 @@ if __name__ == '__main__':
     )
 
 
-    outputs = trainer.predict(predict_dataset=test_dataset, predict_examples=test_example, )
+    outputs = trainer.predict(predict_dataset=test_dataset, predict_examples=test_examples, )
     results = compute_metrics(outputs)
     for k, v in results.items():
         logger.info(f"{k}, {v}")
